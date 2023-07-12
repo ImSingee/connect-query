@@ -41,7 +41,7 @@ import {
 
 type RequireExactlyOne<T, Keys extends keyof T = keyof T> = {
   [K in Keys]-?: Partial<Record<Exclude<Keys, K>, undefined>> &
-    Required<Pick<T, K>>;
+  Required<Pick<T, K>>;
 }[Keys] &
   Pick<T, Exclude<keyof T, Keys>>;
 
@@ -88,6 +88,7 @@ export interface UnaryHooks<I extends Message<I>, O extends Message<O>> {
     enabled: boolean;
     queryKey: ConnectQueryKey<I>;
     queryFn: (context?: QueryFunctionContext<ConnectQueryKey<I>>) => Promise<O>;
+    select: (data: O) => O;
     placeholderData?: () => O | undefined;
     onError?: (error: ConnectError) => void;
   };
@@ -189,10 +190,10 @@ export interface UnaryHooks<I extends Message<I>, O extends Message<O>> {
  * A helper function that will configure the set of hooks a Unary method supports.
  */
 export const unaryHooks = <I extends Message<I>, O extends Message<O>>({
-  methodInfo,
-  typeName,
-  transport: topLevelCustomTransport,
-}: {
+                                                                         methodInfo,
+                                                                         typeName,
+                                                                         transport: topLevelCustomTransport,
+                                                                       }: {
   methodInfo: MethodInfoUnary<I, O>;
   typeName: ServiceType['typeName'];
   transport?: Transport | undefined;
@@ -210,7 +211,7 @@ export const unaryHooks = <I extends Message<I>, O extends Message<O>>({
 
   const createUseQueryOptions: UnaryHooks<I, O>['createUseQueryOptions'] = (
     input,
-    { callOptions, getPlaceholderData, onError, transport },
+    {callOptions, getPlaceholderData, onError, transport},
   ) => {
     const enabled = input !== disableQuery;
 
@@ -224,20 +225,20 @@ export const unaryHooks = <I extends Message<I>, O extends Message<O>>({
 
       ...(getPlaceholderData
         ? {
-            placeholderData: () => {
-              const placeholderData = getPlaceholderData(enabled);
-              if (placeholderData === undefined) {
-                return undefined;
-              }
-              return new methodInfo.O(placeholderData);
-            },
-          }
+          placeholderData: () => {
+            const placeholderData = getPlaceholderData(enabled);
+            if (placeholderData === undefined) {
+              return undefined;
+            }
+            return new methodInfo.O(placeholderData);
+          },
+        }
         : {}),
 
       queryFn: async (context) => {
         assert(enabled, 'queryFn does not accept a disabled query');
         const result = await transport.unary(
-          { typeName, methods: {} },
+          {typeName, methods: {}},
           methodInfo,
           (callOptions ?? context)?.signal,
           callOptions?.timeoutMs,
@@ -249,7 +250,18 @@ export const unaryHooks = <I extends Message<I>, O extends Message<O>>({
 
       queryKey: getQueryKey(input),
 
-      ...(onError ? { onError } : {}),
+      select: (data: O) => {
+        const serializedData = data as unknown;
+
+        if (typeof serializedData === 'string') {
+          data = methodInfo.O.fromJsonString(serializedData);
+        }
+
+        return data;
+      },
+
+
+      ...(onError ? {onError} : {}),
     };
   };
 
@@ -297,9 +309,9 @@ export const unaryHooks = <I extends Message<I>, O extends Message<O>>({
           'pageParamKey' in otherOptions &&
           otherOptions.pageParamKey !== undefined
             ? {
-                ...input,
-                [otherOptions.pageParamKey]: undefined,
-              }
+              ...input,
+              [otherOptions.pageParamKey]: undefined,
+            }
             : sanitizeInputKey?.(input) ?? input;
       }
 
@@ -322,17 +334,17 @@ export const unaryHooks = <I extends Message<I>, O extends Message<O>>({
             'applyPageParam' in otherOptions &&
             otherOptions.applyPageParam !== undefined
               ? otherOptions.applyPageParam({
-                  pageParam: context.pageParam,
-                  input,
-                })
+                pageParam: context.pageParam,
+                input,
+              })
               : {
-                  ...input,
-                  [otherOptions.pageParamKey]:
-                    context.pageParam ?? valueAtPageParam,
-                };
+                ...input,
+                [otherOptions.pageParamKey]:
+                context.pageParam ?? valueAtPageParam,
+              };
 
           const result = await transport.unary(
-            { typeName, methods: {} },
+            {typeName, methods: {}},
             methodInfo,
             (callOptions ?? context).signal,
             callOptions?.timeoutMs,
@@ -344,15 +356,15 @@ export const unaryHooks = <I extends Message<I>, O extends Message<O>>({
 
         queryKey: getQueryKey(sanitizedInput),
 
-        ...(onError ? { onError } : {}),
+        ...(onError ? {onError} : {}),
       };
     },
 
     useMutation: ({
-      transport: optionsTransport,
-      callOptions,
-      onError,
-    } = {}) => {
+                    transport: optionsTransport,
+                    callOptions,
+                    onError,
+                  } = {}) => {
       const contextTransport = useTransport();
       const transport =
         optionsTransport ?? topLevelCustomTransport ?? contextTransport;
@@ -360,7 +372,7 @@ export const unaryHooks = <I extends Message<I>, O extends Message<O>>({
       return {
         mutationFn: async (input, context) => {
           const result = await transport.unary(
-            { typeName, methods: {} },
+            {typeName, methods: {}},
             methodInfo,
             (callOptions ?? context)?.signal,
             callOptions?.timeoutMs,
@@ -369,7 +381,7 @@ export const unaryHooks = <I extends Message<I>, O extends Message<O>>({
           );
           return result.message;
         },
-        ...(onError ? { onError } : {}),
+        ...(onError ? {onError} : {}),
       };
     },
 
