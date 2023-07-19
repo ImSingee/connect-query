@@ -251,10 +251,10 @@ export const unaryHooks = <I extends Message<I>, O extends Message<O>>({
       queryKey: getQueryKey(input),
 
       select: (data: O) => {
-        const serializedData = data as unknown;
+        const dataOrPlain = data as object;
 
-        if (typeof serializedData === 'string') {
-          data = methodInfo.O.fromJsonString(serializedData);
+        if (dataOrPlain.constructor.name === 'Object') { // PlainMessage
+          data = new methodInfo.O(dataOrPlain);
         }
 
         return data;
